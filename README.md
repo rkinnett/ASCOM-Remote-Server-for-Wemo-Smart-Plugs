@@ -32,3 +32,6 @@ Step 2) Enter a port number (or use default 8080) for the ASCOM server and click
 Step 3) In the equipment connection menu for your astronomy software, load the ASCOM Remote Client driver as a switch device, and opent the driver settings menu.  Select "http" service type, enter 127.0.0.1 as the Remote Device Server Name or IP Address, enter the port number you specified as the Server Port in the Wemo ASCOM Server application.  Confirm these settings and start the device.
 
 That's it!  The name and state of your device should now be displayed in your astronomy software, and the switch should be controllable from both your astronomy software and the server application.
+
+## Building this project
+This project was built in Netbeans IDE 12.1 with Gradle Build Tool, with Java runtime 15.0.  Open the project in Netbeans and run Build.
