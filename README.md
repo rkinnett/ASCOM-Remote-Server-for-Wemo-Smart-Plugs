@@ -15,9 +15,7 @@ Java runtime environment, if running the jar file (not needed if running the exe
 This application does not require installation.  Just download the jar, zip, or exe file from the latest Release and save it anywhere on your filesystem.  
 https://github.com/rkinnett/ASCOM-Remote-Server-for-Wemo-Smart-Plugs/releases
   
-The exe should work on most modern Windows platforms, but your antivirus may flag it as malicious, in which case you can either configure an exception for the exe file, or use the jar file instead.
-  
-The jar file requires Java Runtime Environment which you can get here:  https://www.java.com/en/download/
+The exe should work on most modern Windows platforms, but your antivirus may flag it as malicious, in which case you can either configure an exception for the exe file, or use the jar file instead (you'll need Java Runtime installed, as noted above).  
   
 ## Running the server
 Start the exe or jar file by double-clicking in windows, or via command line.
