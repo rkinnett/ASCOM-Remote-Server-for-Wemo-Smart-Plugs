@@ -37,4 +37,4 @@ That's it!  The name and state of your device should now be displayed in your as
 Note that you can run this application on any computer on your network.  It doesn't have to be running on the same machine as your astronomy software.  In Step 3, you'll specify the IP address of the computer running the server application, isntead of localhost (127.0.0.1).
   
 ## Building this project
-This project was built in Netbeans IDE 12.1 with Gradle Build Tool, with Java runtime 15.0.  Open the project in Netbeans and run Build.
+This project was built in Netbeans IDE 12.1 with Gradle Build Tool, with Java runtime 15.0.  Open the project in Netbeans and run Build.  The exe was built using launch4j to encapsulate the jar file with the Java Runtime Environment so the application can run on any Windows machine without Jave installed.
