@@ -54,7 +54,7 @@ import javax.swing.text.BadLocationException;
  */
 public class WemoAscomServer extends javax.swing.JFrame {
    private static final String HOSTNAME = "localhost";
-    private static final int PORT = 8080;
+    private static final int DEFAULT_SERVER_PORT = 8080;
     private static final int BACKLOG = 1;
     private static InetAddress wemoIPAddress = null;
     private static final int WEMO_PORT = 49153;
@@ -137,9 +137,11 @@ public class WemoAscomServer extends javax.swing.JFrame {
         scanProgressBar = new javax.swing.JProgressBar();
         buttonClearLog = new javax.swing.JButton();
         buttonCopyLog = new javax.swing.JButton();
+        serverPortTextArea = new javax.swing.JTextField();
+        jLabel6 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setTitle("Wemo ASCOM Proxy");
+        setTitle("Wemo ASCOM Server");
         setName("GuiFrame"); // NOI18N
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowActivated(java.awt.event.WindowEvent evt) {
@@ -260,6 +262,11 @@ public class WemoAscomServer extends javax.swing.JFrame {
             }
         });
 
+        serverPortTextArea.setText("" + DEFAULT_SERVER_PORT);
+        serverPortTextArea.setToolTipText("TCP Port for communication with your astronomy software");
+
+        jLabel6.setText("Server Port:");
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -267,20 +274,24 @@ public class WemoAscomServer extends javax.swing.JFrame {
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jScrollPane2)
                     .addComponent(jSeparator2, javax.swing.GroupLayout.Alignment.TRAILING)
                     .addComponent(jSeparator1)
-                    .addComponent(jScrollPane2)
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                             .addGroup(layout.createSequentialGroup()
-                                .addComponent(buttonStartServer, javax.swing.GroupLayout.PREFERRED_SIZE, 154, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(jLabel6)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(serverPortTextArea, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(buttonStartServer, javax.swing.GroupLayout.PREFERRED_SIZE, 91, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(jLabel5)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(labelServerRunningIndicator, javax.swing.GroupLayout.PREFERRED_SIZE, 17, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                 .addComponent(jLabel4))
-                            .addGroup(javax.swing.GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
+                            .addGroup(layout.createSequentialGroup()
                                 .addComponent(jLabel1)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(textboxSwitchIP, javax.swing.GroupLayout.PREFERRED_SIZE, 97, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -314,15 +325,16 @@ public class WemoAscomServer extends javax.swing.JFrame {
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addGap(9, 9, 9)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(textboxSwitchIP, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel1)
-                    .addComponent(jLabel2)
-                    .addComponent(labelSwitchStateIndicator, javax.swing.GroupLayout.PREFERRED_SIZE, 16, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(buttonToggleSwitch)
-                    .addComponent(buttonScan)
-                    .addComponent(buttonSetIP)
-                    .addComponent(scanProgressBar, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(scanProgressBar, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(textboxSwitchIP, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(jLabel1)
+                        .addComponent(jLabel2)
+                        .addComponent(labelSwitchStateIndicator, javax.swing.GroupLayout.PREFERRED_SIZE, 16, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(buttonToggleSwitch)
+                        .addComponent(buttonScan)
+                        .addComponent(buttonSetIP)))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(jSeparator1, javax.swing.GroupLayout.PREFERRED_SIZE, 11, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -331,7 +343,9 @@ public class WemoAscomServer extends javax.swing.JFrame {
                     .addComponent(labelServerRunningIndicator)
                     .addComponent(labelClientConnectionIndicator)
                     .addComponent(jLabel4)
-                    .addComponent(buttonStartServer, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(buttonStartServer, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(serverPortTextArea, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jLabel6))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(jSeparator2, javax.swing.GroupLayout.PREFERRED_SIZE, 11, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -913,8 +927,15 @@ public class WemoAscomServer extends javax.swing.JFrame {
     
     private Boolean startAscomServer() {
         Boolean started = false;
+        
+        int serverPort = Integer.parseInt(serverPortTextArea.getText());
+        if(serverPort<1 || serverPort>65536){
+            appendLog(LogLevel.ERROR, "Invalid port; please specify integer between 1 and 65536)");
+            return false;
+        }
+        
         try {
-            server = HttpServer.create(new InetSocketAddress(HOSTNAME, PORT), BACKLOG);
+            server = HttpServer.create(new InetSocketAddress(HOSTNAME, serverPort), BACKLOG);
         } catch (IOException ex) {
             Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
             appendLog(LogLevel.ERROR, "Program error: " + ex);
@@ -1052,6 +1073,7 @@ public class WemoAscomServer extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
+    private javax.swing.JLabel jLabel6;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JSeparator jSeparator1;
     private javax.swing.JSeparator jSeparator2;
@@ -1060,6 +1082,7 @@ public class WemoAscomServer extends javax.swing.JFrame {
     private javax.swing.JLabel labelSwitchStateIndicator;
     private javax.swing.JTextArea logTextArea;
     private javax.swing.JProgressBar scanProgressBar;
+    private javax.swing.JTextField serverPortTextArea;
     private javax.swing.JTextField textboxSwitchIP;
     // End of variables declaration//GEN-END:variables
 }
