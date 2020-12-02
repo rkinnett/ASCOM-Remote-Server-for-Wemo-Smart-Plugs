@@ -37,9 +37,9 @@ Note that you can run this application on any computer on your network.  It does
 You can simply double-click the exe or jar file as noted above to start the application, or you can start it from command line or a Windows shortcut.  The server accepts three optional arguments:  an IP address of the target switch, integer TCP port number for the server, and "start" instruction to automatically connect to the target switch and initiate the ASCOM interfaces.
   
 Examples:  
-WemoAscomServer 192.168.1.100 start
-WemoAscomServer 192.168.1.100 8081 start
-java -jar WemoAscomServer.jar 192.168.1.100 start
+WemoAscomServer 192.168.1.100 start  
+WemoAscomServer 192.168.1.100 8081 start  
+java -jar WemoAscomServer.jar 192.168.1.100 start  
   
   
 ## Building this project
