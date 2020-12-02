@@ -15,7 +15,7 @@ Java runtime environment, if running the jar file (not needed if running the exe
 This application does not require installation.  Just download the exe or jar file from the latest Release and save it anywhere on your filesystem.  
 https://github.com/rkinnett/ASCOM-Remote-Server-for-Wemo-Smart-Plugs/releases
   
-The exe should work on most modern Windows platforms, but your antivirus may flag it as malicious, in which case you can either configure an exception for the exe file, or use the jar file instead (you'll need Java Runtime installed, as noted above).  
+The exe should work on most modern Windows platforms, but your antivirus may flag it as malicious, in which case you can either configure an exception for the exe file, or use the jar file instead (you'll need Java Runtime installed, as noted above).  Or inspect the code and compile from source.
   
 ## Running the server
 Start the exe or jar file by double-clicking in windows, or via command line.
@@ -32,7 +32,7 @@ Step 3) In the equipment connection menu for your astronomy software, load the A
   
 That's it!  The name and state of your device should now be displayed in your astronomy software, and the switch should be controllable from both your astronomy software and the server application.
   
-Note that you can run this application on any computer on your network.  It doesn't have to be running on the same machine as your astronomy software.  In Step 3, you'll specify the IP address of the computer running the server application, isntead of localhost (127.0.0.1).
+Note that you can run this application on any computer on your network.  It doesn't have to be running on the same machine as your astronomy software.  In Step 3, you'll specify the IP address of the computer running the server application instead of localhost (127.0.0.1).
   
 ## Building this project
-This project was built in Netbeans IDE 12.1 with Gradle Build Tool, with Java runtime 15.0.  Open the project in Netbeans and run Build.  The exe was built using launch4j to encapsulate the jar file with the Java Runtime Environment so the application can run on any Windows machine without Jave installed.
+This project was built in Netbeans IDE 12.1 with Gradle Build Tool, with JDK 1.8, in Win10 64-bit.  Open the project in Netbeans and run Build.  The exe was built using launch4j to encapsulate the jar file with the Java Runtime Environment so the application can run on any Windows machine without Jave installed.
