@@ -2,15 +2,20 @@ apply plugin: 'java'
 apply plugin: 'jacoco'
 apply plugin: 'application'
 
+compileJava {
+    sourceCompatibility = '1.8'
+    targetCompatibility = '1.8'
+}
+
 
 
 description = 'ASCOM server for Wemo smart plugs'
 
-mainClassName = 'wemoAscomServer.WemoAscomServer'
+mainClassName = 'wemoAscomServer.WemoAscomServerGUI'
 
 repositories {
     jcenter()
-//    mavenCentral()
+    mavenCentral()
     
 }
 
@@ -19,38 +24,42 @@ dependencies {
     implementation group: 'com.formdev', name: 'flatlaf', version: '0.44'
 }
 
-dependencies {
-    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25'
-    compile group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.25'
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs << '-Xlint:unchecked'
+    options.deprecation = true
 }
 
-jar {
-    manifest {
-        attributes "Main-Class": "com.baeldung.fatjar.Application"
-    }
- 
-    from {
-        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
-    }
+dependencies {
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25'
+    implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.25'
+//    implementation group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.2'
+//    implementation group: 'org.apache.httpcomponents', name: 'httpresponse', version: '4.5.2'
+    implementation 'org.apache.httpcomponents:httpcore:4.4.1'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.6'
+    
 }
+
+
+
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes(
+                'Main-Class': mainClassName
+        )
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+ }
+ 
 
 task customFatJar(type: Jar) {
     manifest {
         attributes 'Main-Class': 'com.baeldung.fatjar.Application'
     }
-    baseName = 'all-in-one-jar'
-    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    archiveBaseName = 'all-in-one-jar'
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
 }
-
-buildscript {
-    repositories {
-        jcenter()
-    }
-    dependencies {
-        classpath 'com.github.jengelman.gradle.plugins:shadow:6.1.0'
-    }
-}
- 
-apply plugin: 'java'
-apply plugin: 'com.github.johnrengelman.shadow'

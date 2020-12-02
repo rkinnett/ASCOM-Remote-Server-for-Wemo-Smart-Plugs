@@ -3,6 +3,15 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
+
+/*
+ * ASCOM server for Wemo smart plugs
+ * by Ryan Kinnet
+ * https://github.com/rkinnett/ASCOM-Remote-Server-for-Wemo-Smart-Plugs
+ *
+ */
+
+
 package wemoAscomServer;
 
 import com.sun.net.httpserver.Headers;
@@ -18,9 +27,6 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.net.UnknownHostException;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -39,12 +45,20 @@ import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.ItemEvent;
 import java.awt.event.KeyEvent;
+import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import javax.swing.SwingWorker;
 import javax.swing.text.BadLocationException;
-
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.impl.client.BasicResponseHandler;
+import org.apache.http.impl.client.HttpClientBuilder;
 
 
 
@@ -52,17 +66,20 @@ import javax.swing.text.BadLocationException;
  *
  * @author Ryan
  */
-public class WemoAscomServer extends javax.swing.JFrame {
+public class WemoAscomServerGUI extends javax.swing.JFrame {
    private static final String HOSTNAME = "localhost";
-    private static final int DEFAULT_SERVER_PORT = 8080;
+    private static int DEFAULT_SERVER_PORT = 8080;
     private static final int BACKLOG = 1;
     private static InetAddress wemoIPAddress = null;
     private static final int WEMO_PORT = 49153;
     
     private static final int IP_SCAN_MIN_SUFFIX = 2;
-    private static final int IP_SCAN_MAX_SUFFIX = 255;
+    private static final int IP_SCAN_MAX_SUFFIX = 254;
     private static final int IP_SCAN_TIMEOUT_MILLIS = 200;
                 
+    private static String SWITCH_IP_FROM_CMD_ARG = "";
+    private static Boolean START_SERVER_ON_STARTUP = false;
+    
     private static HttpServer server = null;
 
     private static final String HEADER_CONTENT_TYPE = "Content-Type";
@@ -101,7 +118,7 @@ public class WemoAscomServer extends javax.swing.JFrame {
     /**
      * Creates new form WemoAscomServerGUI
      */
-    public WemoAscomServer() {       
+    public WemoAscomServerGUI() {       
         initComponents();
         setIcon();
     }
@@ -367,7 +384,6 @@ public class WemoAscomServer extends javax.swing.JFrame {
         // Start ASCOM Server if not already running and if switch is accessible:
         if(!serverStarted){
             if(switchAccessible){
-                appendLog(LogLevel.EVENT, "Starting ASCOM device server");
                 serverStarted =  startAscomServer();
                 buttonStartServer.setText("Server started");
                 buttonStartServer.setEnabled(false);
@@ -389,15 +405,12 @@ public class WemoAscomServer extends javax.swing.JFrame {
     }//GEN-LAST:event_buttonToggleSwitchActionPerformed
 
     private void textboxSwitchIPActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_textboxSwitchIPActionPerformed
-        // TODO add your handling code here:
     }//GEN-LAST:event_textboxSwitchIPActionPerformed
 
     private void formWindowActivated(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowActivated
-             
     }//GEN-LAST:event_formWindowActivated
 
     private void textboxSwitchIPKeyTyped(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_textboxSwitchIPKeyTyped
-        // TODO add your handling code here:
     }//GEN-LAST:event_textboxSwitchIPKeyTyped
 
     private void textboxSwitchIPKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_textboxSwitchIPKeyReleased
@@ -408,7 +421,6 @@ public class WemoAscomServer extends javax.swing.JFrame {
             buttonSetIP.setEnabled(true);
             
             if (evt.getKeyCode() == KeyEvent.VK_ENTER) {
-                System.out.println("ENTER key pressed");
                 setSwitchIP();
             }
             
@@ -420,20 +432,42 @@ public class WemoAscomServer extends javax.swing.JFrame {
 
     private void formWindowOpened(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowOpened
         scanProgressBar.setVisible(false);
-        try {
-            // TODO add your handling code here:
-            InetAddress IP=InetAddress.getLocalHost();
-            appendLog(LogLevel.INFO, "IP of this system is "+IP.getHostAddress());
-            appendLogBlankLine(LogLevel.INFO);
-            String baseIp = IP.getHostAddress().replaceAll("[0-9]+$", "???");
-            textboxSwitchIP.setText(baseIp);
-        } catch (UnknownHostException ex) {
-            Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
-            appendLog(LogLevel.ERROR, "Program error: " + ex);
+                
+        if(SWITCH_IP_FROM_CMD_ARG.length()>0){
+            textboxSwitchIP.setText(SWITCH_IP_FROM_CMD_ARG);
+            setSwitchIP();
+            textboxSwitchIP.setForeground(new Color(200, 200, 200));
+            buttonSetIP.setEnabled(true);
+            
+        } else {
+            // Fill in IP address template based on host IP:        
+            try {
+                InetAddress IP=InetAddress.getLocalHost();
+                appendLog(LogLevel.INFO, "IP of this system is "+IP.getHostAddress());
+                appendLogBlankLine(LogLevel.INFO);
+                String baseIp = IP.getHostAddress().replaceAll("[0-9]+$", "???");
+                textboxSwitchIP.setText(baseIp);
+            } catch (UnknownHostException ex) {
+                Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
+                appendLog(LogLevel.ERROR, "Program error: " + ex);
+            }
         }
         
-        appendLog(LogLevel.EVENT, "STEP 1:  Enter switch IP and press enter key or Set button.");
-        appendLogBlankLine(LogLevel.EVENT);
+        if(START_SERVER_ON_STARTUP){
+            // Start server
+            if(switchAccessible){
+                serverStarted =  startAscomServer();
+                buttonStartServer.setText("Server started");
+                buttonStartServer.setEnabled(false);
+            } else {
+                appendLog(LogLevel.ERROR, "Can't start ASCOM server while switch is inaccessible.");
+                appendLog(LogLevel.ERROR, "Please verify your switch is on the network, or try a different address.");
+            }
+            
+        } else {
+            appendLog(LogLevel.EVENT, "STEP 1:  Enter switch IP and press enter key or Set button.");
+            appendLogBlankLine(LogLevel.EVENT);
+        }
     }//GEN-LAST:event_formWindowOpened
 
     private void comboLogLevelItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_comboLogLevelItemStateChanged
@@ -447,9 +481,6 @@ public class WemoAscomServer extends javax.swing.JFrame {
     }//GEN-LAST:event_comboLogLevelItemStateChanged
 
     private void buttonSetIPActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonSetIPActionPerformed
-       // hardcode switch IP for easier dev:
-        //final String strSwitchIP = "192.168.1.5";
-        
         // Get switch IP from textbox:
         final String strSwitchIP = textboxSwitchIP.getText();                
         final Boolean userEnteredValidIP = checkIPFormat(strSwitchIP);
@@ -493,7 +524,7 @@ public class WemoAscomServer extends javax.swing.JFrame {
         try {           
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
-            Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
             appendLog(LogLevel.ERROR, "Program error: " + ex);
         }    
         */
@@ -510,7 +541,7 @@ public class WemoAscomServer extends javax.swing.JFrame {
                 }
             }
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(WemoAscomServer.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+            java.util.logging.Logger.getLogger(WemoAscomServerGUI.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
         }
         */           
         
@@ -530,10 +561,38 @@ public class WemoAscomServer extends javax.swing.JFrame {
         //</editor-fold>
         //</editor-fold>
 
+        if(args.length>0){
+            for(int i=0; i<args.length; i++){
+                System.out.println("Argument " + i + ": " + args[i]);
+                
+                // Check if this arg looks like an IP address:
+                if(args[i].matches( "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$" )) {
+                    // Set Wemo device IP address
+                    System.out.println("  looks like an IP address");
+                    SWITCH_IP_FROM_CMD_ARG = args[i];
+                }
+                    
+                // Check if this arg looks like a port number:    
+                else if(args[i].matches( "^[0-9]+$" )) {
+                    System.out.println("  looks like a port number");
+                    DEFAULT_SERVER_PORT = Integer.parseInt(args[i]);
+                } 
+                
+                // Check if this arg is "start":
+                else if(args[i].matches( "^[Ss]tart" )) {
+                    System.out.println("  will start Server automatically if switch IP is valid.");
+                    START_SERVER_ON_STARTUP = true;
+                }
+                
+                else {
+                    System.out.println("  unrecognized argument");
+                }
+            }
+        }
 
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(() -> {
-            new WemoAscomServer().setVisible(true);
+            new WemoAscomServerGUI().setVisible(true);
         });
     }
 
@@ -550,20 +609,25 @@ public class WemoAscomServer extends javax.swing.JFrame {
                 scanProgressBar.setMaximum(IP_SCAN_MAX_SUFFIX);        
                 scanProgressBar.setVisible(true);
 
-                final Duration timeout = Duration.ofMillis(IP_SCAN_TIMEOUT_MILLIS);
-                var client = HttpClient.newHttpClient();
+                RequestConfig config = RequestConfig.custom()
+                  .setConnectTimeout(IP_SCAN_TIMEOUT_MILLIS)
+                  .setConnectionRequestTimeout(IP_SCAN_TIMEOUT_MILLIS)
+                  .setSocketTimeout(IP_SCAN_TIMEOUT_MILLIS).build();
+                
+                HttpClient client = HttpClientBuilder.create().setDefaultRequestConfig(config).build();
 
                 String IPmask;
                 try {                    
                     IPmask = InetAddress.getLocalHost().getHostAddress().replaceAll("[0-9]+$", "");
                 } catch (UnknownHostException ex) {
-                    Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
                     return "";
                 }   
 
                 appendLog(LogLevel.EVENT, "Probing port " + WEMO_PORT + " in IP range " + IPmask + IP_SCAN_MIN_SUFFIX + " to " + IPmask + IP_SCAN_MAX_SUFFIX);           
                 appendLogBlankLine(LogLevel.EVENT);
 
+                
                 for (int i=IP_SCAN_MIN_SUFFIX; i<=IP_SCAN_MAX_SUFFIX; i++){
                     if(!scanning) return "";
                     
@@ -572,24 +636,26 @@ public class WemoAscomServer extends javax.swing.JFrame {
                     appendLog(LogLevel.INFO, "Probing " + urlStr);
                     URI uri = URI.create(urlStr);
 
-                    var request = HttpRequest.newBuilder(uri).timeout(timeout).build();
+                    HttpGet request = new HttpGet(uri);
                     HttpResponse response = null;
                     try {
-                        response = client.send(request, HttpResponse.BodyHandlers.ofString());
-                    } catch (IOException | InterruptedException ex) {
-                        //Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
+                        response = client.execute(new HttpGet(uri));
+                    } catch (IOException ex) {
+                        //Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
                         appendLog(LogLevel.DEBUG, "Program error: " + ex.getMessage());
                     }
-                    Boolean reachable = (response!=null && response.statusCode()==404);
+                    final Boolean reachable = (response!=null && response.getStatusLine().getStatusCode()==404);
+
                     if(reachable){
                         appendLog(LogLevel.EVENT, "Found open port " + WEMO_PORT + " at " + testIP);
                         
-                        var switchInfo = wemoGetSwitchInfo(testIP);
+                        Map<String, String> switchInfo = wemoGetSwitchInfo(testIP);
                         if(switchInfo.containsKey("friendlyName")){
                             appendLog(LogLevel.EVENT, "  Switch name: " + switchInfo.get("friendlyName"));
                         }
                         if(switchInfo.containsKey("binaryState")){
-                            appendLog(LogLevel.EVENT, "  Switch state: " + ("1".equals(switchInfo.get("binaryState"))?"ON":"OFF"));
+                            switchIsOn = "1".equals(switchInfo.get("binaryState"));
+                            appendLog(LogLevel.EVENT, "  Switch state: " + (switchIsOn?"ON":"OFF"));
                         }     
                         appendLogBlankLine(LogLevel.EVENT);
                     } else {
@@ -613,7 +679,7 @@ public class WemoAscomServer extends javax.swing.JFrame {
         sw1.execute();  
     } 
     
-    private void setSwitchIP() {                                            
+    private void setSwitchIP() {
         // Get switch IP from textbox:
         final String strSwitchIP = textboxSwitchIP.getText();                
         final Boolean userEnteredValidIP = checkIPFormat(strSwitchIP);
@@ -621,12 +687,11 @@ public class WemoAscomServer extends javax.swing.JFrame {
             appendLog(LogLevel.ERROR, "User entered invalid IP address");
             return;
         }
+        appendLog(LogLevel.EVENT, "User set switch address to " + strSwitchIP);        
        
         // Check if Wemo switch is accessible:
         try {
             wemoIPAddress = InetAddress.getByName(strSwitchIP);
-            appendLog(LogLevel.INFO, "Switch IP address: " + wemoIPAddress.getHostAddress());
-
             switchAccessible = wemoTestConnection(wemoIPAddress.getHostAddress());
             appendLog(switchAccessible?LogLevel.EVENT:LogLevel.ERROR,  switchAccessible?"  Switch TCP port is open":"  Switch is unreachable");
             if(switchAccessible){
@@ -634,8 +699,9 @@ public class WemoAscomServer extends javax.swing.JFrame {
                 buttonToggleSwitch.setEnabled(true);
                 
                 wemoGetSwitchState();
+                setSwitchStateIndicator(switchIsOn);
                 
-                var switchInfo = wemoGetSwitchInfo(wemoIPAddress.getHostAddress());
+                Map<String, String> switchInfo = wemoGetSwitchInfo(wemoIPAddress.getHostAddress());
                 if(switchInfo.containsKey("friendlyName")){
                     DEVICE_NAME = "Wemo Switch (\"" + switchInfo.get("friendlyName") + "\")";
                     appendLog(LogLevel.STATUS, "  Switch name: " + switchInfo.get("friendlyName"));
@@ -660,7 +726,7 @@ public class WemoAscomServer extends javax.swing.JFrame {
                 buttonToggleSwitch.setEnabled(false);
             }
         } catch (UnknownHostException ex) {
-            Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
             appendLog(LogLevel.ERROR, "Program error: " + ex);
         }
     }  
@@ -669,10 +735,8 @@ public class WemoAscomServer extends javax.swing.JFrame {
         
     private Void setIcon(){
         // the path must be relative to the src/resources folder
-        java.net.URL imageURL = WemoAscomServer.class.getResource("/power_64.png");        
-        //System.out.println(imageURL!=null?"found icon":"can't find icon");
+        java.net.URL imageURL = WemoAscomServerGUI.class.getResource("/power_64.png");        
         if (imageURL != null) {
-            //System.out.println(imageURL.toString());
             ImageIcon icon = new ImageIcon(imageURL);
             setIconImage(icon.getImage());
         }
@@ -711,20 +775,25 @@ public class WemoAscomServer extends javax.swing.JFrame {
                + "ErrorNumber:0,"
                + "ErrorMessage:''"
                + "}";
-        appendLog(LogLevel.INFO, "Sending reply: " + reply);
-        final var rawResponseBody = reply.getBytes(CHARSET);
+        byte[] rawResponseBody = reply.getBytes(CHARSET);
+        
+        // Send headers:
+        appendLog(LogLevel.DEBUG, "  Sending response headers");                
         try {
             he.sendResponseHeaders(STATUS_OK, rawResponseBody.length);
         } catch (IOException ex) {
-            Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
-            appendLog(LogLevel.ERROR, "Program error: " + ex);
+            Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
+            appendLog(LogLevel.ERROR, "Error sending request headers. " + ex);
             return false;
         }
+        
+        // Send body:
+        appendLog(LogLevel.INFO, "  Sending response body: " + reply);
         try {
             he.getResponseBody().write(rawResponseBody);
         } catch (IOException ex) {
-            Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
-            appendLog(LogLevel.ERROR, "Program error: " + ex);
+            Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
+            appendLog(LogLevel.ERROR, "Error sending request body.  " + ex);
             return false;
         }
         return true;
@@ -743,7 +812,7 @@ public class WemoAscomServer extends javax.swing.JFrame {
             }
             isr.close();
         } catch (IOException ex) {
-            Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
             appendLog(LogLevel.ERROR, "Program error: " + ex);
         } 
         return requestParameters;
@@ -758,7 +827,6 @@ public class WemoAscomServer extends javax.swing.JFrame {
                 final String requestParameterName = decodeUrlComponent(requestParameter[0]);
                 requestParameters.putIfAbsent(requestParameterName, new ArrayList<>());
                 final String requestParameterValue = requestParameter.length > 1 ? decodeUrlComponent(requestParameter[1]) : null;
-                //appendLog(requestParameterName + ": " + requestParameterValue);
                 requestParameters.get(requestParameterName).add(requestParameterValue);
             }
         }
@@ -779,16 +847,18 @@ public class WemoAscomServer extends javax.swing.JFrame {
         appendLog(LogLevel.DEBUG, "Looking for switch at " + urlStr);
         final Duration timeout = Duration.ofMillis(200);
         URI uri = URI.create(urlStr);
-        var client = HttpClient.newHttpClient();
-        var request = HttpRequest.newBuilder(uri).timeout(timeout).build();
+        HttpClient client = HttpClientBuilder.create().build();
         HttpResponse response = null;
+        
+        // Send request and expect 404 response if port is open:
         try {
-            response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        } catch (IOException | InterruptedException ex) {
-            //Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
-            appendLog(LogLevel.DEBUG, "Program error: " + ex.getMessage());
+            response = client.execute(new HttpGet(uri));
+        } 
+        catch (IOException ex) { 
+            //Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
+            appendLog(LogLevel.DEBUG, "  Port unavailable? " + ex.getMessage());
         }
-        Boolean reachable = (response!=null && response.statusCode()==404);
+        final Boolean reachable = (response!=null && response.getStatusLine().getStatusCode()==404);
         appendLog(LogLevel.DEBUG, reachable?"  Switch TCP port is open":"  Switch is unreachable");
         return reachable;
     }
@@ -798,30 +868,45 @@ public class WemoAscomServer extends javax.swing.JFrame {
         appendLog(LogLevel.STATUS, "Getting switch info");
         String urlStr = "http://" + ipStr + ":" + WEMO_PORT + "/setup.xml";
         appendLog(LogLevel.DEBUG, "  Making GET request to " + urlStr);
-        var client = HttpClient.newHttpClient();
-        var request = HttpRequest.newBuilder(URI.create(urlStr)).build();
+        HttpClient client = HttpClientBuilder.create().build();
         try {
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            String responseBody = response.body();
-            appendLog((response.statusCode()==200)?LogLevel.DEBUG:LogLevel.ERROR, "  Response status code: " + response.statusCode());                
-            appendLog((response.statusCode()==200)?LogLevel.DEBUG:LogLevel.ERROR, "  Response body: " + response.body());
+            URI uri = new URI(urlStr);
+            HttpGet request = new HttpGet(uri);
+
+            // Send GET request:
+            final HttpResponse response = client.execute(request);
             
+            // Parse response:
+            final String responseBody = new BasicResponseHandler().handleResponse(response);
+            appendLog((response.getStatusLine().getStatusCode()==200)?LogLevel.DEBUG:LogLevel.ERROR, "  Response status code: " + response.getStatusLine().getStatusCode());                
+            appendLog((response.getStatusLine().getStatusCode()==200)?LogLevel.DEBUG:LogLevel.ERROR, "  Response body: " + responseBody);            
             final String[] fieldNames = {"friendlyName", "modelName", "modelDescription", "binaryState", "macAddress", "serialNumber"};
             for (String fieldName : fieldNames ){
                 String fieldVal = "";
                 if(responseBody.contains(fieldName)){
-                    fieldVal = (response.body().split("<" + fieldName + ">")[1].split("</" + fieldName + ">")[0]);
+                    fieldVal = (responseBody.split("<" + fieldName + ">")[1].split("</" + fieldName + ">")[0]);
                     switchInfo.put(fieldName, fieldVal);
                 }
                 appendLog(LogLevel.DEBUG, "  " + fieldName + ": " + fieldVal);
             }
-
-        } catch (IOException | InterruptedException ex) {
-            Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
             appendLog(LogLevel.ERROR, "Program error: " + ex);
+        } catch (URISyntaxException ex) {
+            Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
+            appendLog(LogLevel.ERROR, "URI error: " + ex);
+            appendLog(LogLevel.ERROR, "failed to parse target url: " + urlStr);
         }
         return switchInfo;
     }
+    
+    
+    private void setSwitchStateIndicator(Boolean switchState) {
+        appendLog(LogLevel.DEBUG, "Setting switch state indicator: " + (switchState?"ON":"OFF"));
+        labelSwitchStateIndicator.setText((switchState?"ON":"OFF"));
+        labelSwitchStateIndicator.setForeground((switchState? new java.awt.Color(230, 200, 160) : new java.awt.Color(110, 125, 150)));
+    }
+    
     
     private Boolean wemoGetSwitchState(){
         Boolean switchState = switchIsOn;
@@ -829,17 +914,24 @@ public class WemoAscomServer extends javax.swing.JFrame {
         String requestBody = "<?xml version=\"1.0\" encoding=\"utf-8\"?> "
                 + "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"> "
                 + "<s:Body> <u:GetBinaryState xmlns:u=\"urn:Belkin:service:basicevent:1\"/> </s:Body> </s:Envelope>";
-        final HttpResponse<String> response = wemoHttpRequest(requestBody);
-        if(response.statusCode()==200) {
-            final Map<String, List<String>> requestParameters;            
-            final String binaryState = (response.body().split("<BinaryState>")[1].split("</BinaryState>")[0]);
-            appendLog(LogLevel.DEBUG, "  BinaryState: " + binaryState);
-            switchState = ("1".equals(binaryState));
-            switchIsOn = switchState;
-            appendLog(LogLevel.INFO, "  Switch state: " + (switchIsOn?"on":"off"));            
+
+        // Get state from device:
+        ParsedResponse parsedResponse = wemoHttpRequest(requestBody);
+        
+        // Parse response:
+        if(parsedResponse.valid) {
+            if(parsedResponse.body.contains("BinaryState")){
+                final String binaryState = (parsedResponse.body.split("<BinaryState>")[1].split("</BinaryState>")[0]);
+                appendLog(LogLevel.DEBUG, "  BinaryState: " + binaryState);
+                switchState = ("1".equals(binaryState));
+                switchIsOn = switchState;
+                appendLog(LogLevel.INFO, "  Switch state: " + (switchIsOn?"on":"off"));
+            } else {
+                appendLog(LogLevel.ERROR, "Response does not contain BinaryState field.");
+            }
+        } else {
+            appendLog(LogLevel.DEBUG, "Response was invalid");
         }
-        labelSwitchStateIndicator.setText((switchState?"ON":"OFF"));
-        labelSwitchStateIndicator.setForeground((switchState? new java.awt.Color(230, 200, 160) : new java.awt.Color(110, 125, 150)));
 
         return switchState;
     }
@@ -856,47 +948,60 @@ public class WemoAscomServer extends javax.swing.JFrame {
                 + "<BinaryState>" + setVal + "</BinaryState> "
                 + "</u:SetBinaryState> </s:Body> </s:Envelope>";
         appendLog(LogLevel.DEBUG, "  request body: " + requestBody);
-                
-        final HttpResponse<String> response = wemoHttpRequest(requestBody);
-        if(response.statusCode()==200) {
+
+        // Send POST request to set switch state:
+        final ParsedResponse parsedResponse = wemoHttpRequest(requestBody);
+
+        // Request switch state to verify:
+        if(parsedResponse.valid) {
             succeeded = true;
             switchIsOn = wemoGetSwitchState();
-            appendLog(LogLevel.EVENT, "Switch state set to " + (switchIsOn?"on":"off"));            
+            appendLog(LogLevel.EVENT, "Switch state set to " + (switchIsOn?"on":"off"));   
+            setSwitchStateIndicator(switchIsOn);
         }
         appendLog(LogLevel.DEBUG, "Switch state: " + (switchIsOn?"on":"off"));            
         return succeeded;      
     }
     
-    private HttpResponse<String>  wemoHttpRequest(String requestBody ){
-        HttpResponse<String> response = null;
-        Boolean succeeded = false;
-        String wemoCommand = (requestBody.contains("SetBinaryState")? "SetBinaryState" : "GetBinaryState");
-        
+    public class ParsedResponse {
+        public Boolean valid = false;
+        public int statusCode;
+        public String body;
+        public Map<String, String> data;
+    }
+    
+    private ParsedResponse  wemoHttpRequest(String requestBody ){
+        ParsedResponse parsedResponse = new ParsedResponse();
+
+        String wemoCommand = (requestBody.contains("SetBinaryState")? "SetBinaryState" : "GetBinaryState");        
         final String urlStr = "http://" + wemoIPAddress.getHostAddress() + ":" + WEMO_PORT + "/upnp/control/basicevent1";
         appendLog(LogLevel.DEBUG, "  Making POST request to " + urlStr);
         
-        var client = HttpClient.newHttpClient();
+        HttpClient client = HttpClientBuilder.create().setUserAgent("").build();
         
-        List<String> headers = new ArrayList<>();
-        headers.add("User-Agent");      headers.add("");
-        headers.add("Content-type");    headers.add("text/xml; charset=\"utf-8\"");
-        headers.add("SOAPACTION");      headers.add("\"urn:Belkin:service:basicevent:1#" + wemoCommand + "\"");
+        HttpPost request = new HttpPost(urlStr);
+        request.addHeader("User-Agent", "");
+        request.addHeader("Content-type", "text/xml; charset=\"utf-8\"");
+        request.addHeader("SOAPACTION", "\"urn:Belkin:service:basicevent:1#" + wemoCommand + "\"");
         
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(urlStr))
-            .headers(headers.toArray(String[]::new))
-            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-            .build();        
-            
-        try {
-            response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            appendLog((response.statusCode()==200)?LogLevel.DEBUG:LogLevel.ERROR, "  Response status code: " + response.statusCode());                
-            appendLog((response.statusCode()==200)?LogLevel.DEBUG:LogLevel.ERROR, "  Response body: " + response.body());
-        } catch (IOException | InterruptedException ex) {
-            Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
+       try {
+            request.setEntity(new ByteArrayEntity(requestBody.getBytes("UTF8")));
+            HttpResponse response = client.execute(request);
+            parsedResponse.statusCode = response.getStatusLine().getStatusCode();
+            parsedResponse.valid = (parsedResponse.statusCode==200);
+            if(parsedResponse.valid){
+                parsedResponse.body = new BasicResponseHandler().handleResponse(response);
+                appendLog(LogLevel.DEBUG, "  Response status code: " + parsedResponse.statusCode);
+                appendLog(LogLevel.DEBUG, "  Response body: " + parsedResponse.body);
+            } else {
+                appendLog(LogLevel.ERROR, "  Response status code: " + parsedResponse.statusCode);                
+            }
+           
+       } catch (IOException ex) {
+            Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
             appendLog(LogLevel.ERROR, "Program error: " + ex);
-        }        
-        return response;
+       }
+        return parsedResponse;
     }
         
     private void appendLogBlankLine(LogLevel levelThisEntry){
@@ -915,7 +1020,7 @@ public class WemoAscomServer extends javax.swing.JFrame {
             try {
                 logTextArea.replaceRange("", 0, logTextArea.getLineEndOffset(0));
             } catch (BadLocationException ex) {
-                Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
                 appendLog(LogLevel.ERROR, "Program error: " + ex);
             }
         }
@@ -925,25 +1030,24 @@ public class WemoAscomServer extends javax.swing.JFrame {
         }
     }
     
-    private Boolean startAscomServer() {
-        Boolean started = false;
-        
+    private Boolean startAscomServer() {       
         int serverPort = Integer.parseInt(serverPortTextArea.getText());
         if(serverPort<1 || serverPort>65536){
             appendLog(LogLevel.ERROR, "Invalid port; please specify integer between 1 and 65536)");
             return false;
         }
+        appendLog(LogLevel.EVENT, "Starting ASCOM-Remote device server on port " + serverPort);
         
         try {
             server = HttpServer.create(new InetSocketAddress(HOSTNAME, serverPort), BACKLOG);
         } catch (IOException ex) {
-            Logger.getLogger(WemoAscomServer.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(WemoAscomServerGUI.class.getName()).log(Level.SEVERE, null, ex);
             appendLog(LogLevel.ERROR, "Program error: " + ex);
         }
         
         server.createContext("/", (HttpExchange he) -> {
             appendLogBlankLine(LogLevel.EVENT);
-            try (he) {
+            try {
                 final String clientAddr = he.getRemoteAddress().toString().split("/")[1].split(":")[0];
                 final String requestMethod = he.getRequestMethod().toUpperCase();
                 final String requestURI = he.getRequestURI().toString();
@@ -966,82 +1070,90 @@ public class WemoAscomServer extends javax.swing.JFrame {
                 final Headers responseHeaders = he.getResponseHeaders();
                 responseHeaders.set(HEADER_CONTENT_TYPE, String.format("application/json; charset=%s", CHARSET));
                 
+                final Boolean to_state;
+                
                 switch (requestMethod) {
                     
-                    case METHOD_GET -> {
+                    case METHOD_GET:
                         switch (ascomCommand) {
                             // Handle common GET methods for all ASCOM devices: 
-                            case "connected"        -> { sendResponse(he, clientConnected.toString()); }
-                            case "name"             -> { sendResponse(he, DEVICE_NAME); }
-                            case "description"      -> { sendResponse(he, DEVICE_DESCRIPTION); }
-                            case "driverinfo"       -> { sendResponse(he, DRIVER_INFO); }
-                            case "driverversion"    -> { sendResponse(he, DRIVER_VER); }
-                            case "interfaceversion" -> { sendResponse(he, INTERFACE_VER); }
-                            case "supportedactions" -> { sendResponse(he, "[\"setswitch\"]"); }
+                            case "connected"        : sendResponse(he, clientConnected.toString()); break;
+                            case "name"             : sendResponse(he, DEVICE_NAME); break;
+                            case "description"      : sendResponse(he, DEVICE_DESCRIPTION); break;
+                            case "driverinfo"       : sendResponse(he, DRIVER_INFO); break;
+                            case "driverversion"    : sendResponse(he, DRIVER_VER); break;
+                            case "interfaceversion" : sendResponse(he, INTERFACE_VER); break;
+                            case "supportedactions" : sendResponse(he, "[\"setswitch\"]"); break;
                             
                             // Handle switch-specific GET methods:
-                            case "maxswitch"        -> { sendResponse(he, "1"); }
-                            case "canwrite"         -> { sendResponse(he, "True"); }
-                            case "getswitch"        -> { sendResponse(he, wemoGetSwitchState().toString()); }
-                            case "getswitchdescription" -> { sendResponse(he, DEVICE_DESCRIPTION); }  // intentionally switched
-                            case "getswitchname"    -> { sendResponse(he, DEVICE_NAME); }  // intentionally switched
-                            case "getswitchvalue"   -> { sendResponse(he, wemoGetSwitchState()?"1":"0"); } // swtich "value" as double (duty cycle)
-                            case "minswitchvalue"   -> { sendResponse(he, "0"); }
-                            case "maxswitchvalue"   -> { sendResponse(he, "1"); }
-                            case "switchstep"       -> { sendResponse(he, "1"); }
+                            case "maxswitch"        : sendResponse(he, "1"); break;
+                            case "canwrite"         : sendResponse(he, "True"); break;
+                            case "getswitch"        : sendResponse(he, wemoGetSwitchState().toString()); 
+                                                      setSwitchStateIndicator(switchIsOn); 
+                                                      break;
+                            case "getswitchdescription" : sendResponse(he, DEVICE_DESCRIPTION); break; 
+                            case "getswitchname"    : sendResponse(he, DEVICE_NAME); break; 
+                            case "getswitchvalue"   : sendResponse(he, wemoGetSwitchState()?"1":"0"); break; // swtich "value" as double (duty cycle)
+                            case "minswitchvalue"   : sendResponse(he, "0"); break;
+                            case "maxswitchvalue"   : sendResponse(he, "1"); break;
+                            case "switchstep"       : sendResponse(he, "1"); break;
                             
-                            default          -> {
+                            default:
                                 appendLog(LogLevel.ERROR, "Unrecognized GET request");
                                 // fixme:  send "not implemented" error to client
-                            }
-                        }                        
-                    }    
+                        }
+                        break;
                     
-                    case METHOD_PUT -> {
+                    case METHOD_PUT:
                         switch (ascomCommand) {
+                            
                             // Handle common PUT mehods for all ASCOM devices:
-                            case "connected" -> {  
+                            case "connected":
                                 appendLog(LogLevel.INFO, "Client asserts connection state");
                                 clientConnected = ("[True]".equals(requestParameters.get("Connected").toString()));
                                 appendLog(LogLevel.STATUS, "State set to: " + (clientConnected ? "Connected" : "Disconnected"));
                                 sendResponse(he, null);
                                 labelClientConnectionIndicator.setText(clientConnected?"\u2713":"X");
                                 labelClientConnectionIndicator.setForeground(clientConnected?Color.GREEN:Color.RED);
-                            }
-                            case "action"        -> { sendResponse(he, "OK"); }
-                            case "commandblind"  -> { sendResponse(he, null); }
-                            case "commandbool"   -> { sendResponse(he, "True"); }
-                            case "commandstring" -> { sendResponse(he, "OK"); }
+                                break;
+                                
+                            case "action"        : sendResponse(he, "OK"); break;
+                            case "commandblind"  : sendResponse(he, null); break;
+                            case "commandbool"   : sendResponse(he, "True"); break;
+                            case "commandstring" : sendResponse(he, "OK"); break;
                             
                             // Handle switch-specific PUT commands:
-                            case "setswitch"        -> { 
-                                final Boolean to_state = ("[True]".equals(requestParameters.get("State").toString()));
+                            case "setswitch":
+                                to_state = ("[True]".equals(requestParameters.get("State").toString()));
                                 appendLog(LogLevel.STATUS, "Setting state to " + (to_state ? "On" : "Off"));
                                 wemoSetSwitchState(to_state);
                                 sendResponse(he, null); 
-                            }
-                            case "setswitchname"    -> { sendResponse(he, "OK"); }
-                            case "setswitchvalue"   -> { 
-                                final Boolean to_state = ("[1]".equals(requestParameters.get("Value").toString()));
+                                break;
+                                
+                            case "setswitchname"    : sendResponse(he, "OK"); break;
+                            case "setswitchvalue"   : 
+                                to_state = ("[1]".equals(requestParameters.get("Value").toString()));
                                 appendLog(LogLevel.STATUS, "Setting state to " + (to_state ? "On" : "Off"));
                                 wemoSetSwitchState(to_state);
                                 sendResponse(he, null); 
-                            }                            
-                            default          -> {
+                                break;
+                                
+                            default:
                                 appendLog(LogLevel.ERROR, "Unrecognized PUT request");
                                 // fixme:  send "not implemented" error to client
-                            }                            
+                                break;
                         }
-                    }
+                        break;
                     
-                    default -> {
+                    default:
                         appendLog(LogLevel.ERROR, "Unexpected HTTP Method: " + requestMethod);
-                    }
                 }
                 appendLog(LogLevel.INFO, "done");
             } 
 
             finally {
+                appendLog(LogLevel.DEBUG, "Closing http exchange");
+                he.close();
                 ServerTransactionCount++;
             }
         });
