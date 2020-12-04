@@ -2,6 +2,7 @@
 This appliation is designed to run alongside your astronomy software, relaying commands and status to and from a single Wemo smart plug.
   
   ![NINA and Wemo ASCOM Server](NINA_and_Wemo_ASCOM_Server.png)
+  NINA astronomy software on the left, Wemo ASCOM Server on the right.  
   
 ## Requirements:
 A Wemo smart plug connected to your local network.
@@ -47,3 +48,6 @@ java -jar WemoAscomServer.jar 192.168.1.100 start
   
 ## Building this project
 This project was built in Netbeans IDE 12.1 with Gradle Build Tool, with JDK 1.8, in Win10 64-bit.  Open the project folder in Netbeans and run Build.  After compiling in Netbeans, the jar was signed using jarsigner, then the exe was compiled using launch4j to encapsulate the jar file with the Java Runtime Environment so the application can run on any Windows machine without Jave installed.
+  
+## Feedback
+If you have any feedback - ideas, suggestions, complaints, or PRAISE - please let me know here:  https://discord.gg/uFQWtcMw
